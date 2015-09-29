@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Implements hook_schema() test
+ * Implements hook_schema()
  */
 function form_example_schema() {
   $schema ['form_example'] = array(
