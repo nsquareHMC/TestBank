@@ -1,0 +1,4 @@
+name = "Question Upload"
+description = "Module to manually upload a question"
+core = "7.x"
+version = "7.x-1.0"
