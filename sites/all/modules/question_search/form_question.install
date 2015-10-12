@@ -1,0 +1,41 @@
+<?php
+
+/**
+ * Implements hook_schema()
+ */
+function form_question_schema() {
+  $schema ['form_question'] = array(
+    // Example (partial) specification for table "node".
+    'description' => 'An example table.',
+    'fields' => array(
+      'fe_id' => array(
+        'description' => 'The primary identifier for my table.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'subject' => array(
+        'description' => 'A field for storing short strings of text.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'tags' => array(
+        'description' => 'A field for storing short strings of text.',
+        'type' => 'varchar',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'question' => array(
+        'description' => 'A field for storing longer text.',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+    ),
+    'indexes' => array(
+      'form_question_subject' => array('subject'),
+    ),
+    'primary key' => array('fe_id'),
+  );
+  return $schema;
+}
