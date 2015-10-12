@@ -1,0 +1,163 @@
+<?php
+
+/**
+ * Implements hook_permission().
+ */
+function form_question_permission() {
+	return array(
+		'submit form_question' => array(
+			'title' => t('Submit form_question'),
+			'description' => t('Submit the form_question form'),
+			),
+		'access form_question submissions' => array(
+			'title' => t('Access form_question submissions'),
+			'description' => t('Access the form_question submissions'),
+			),
+		);
+}
+
+function form_question_menu() {
+  $items = array();
+  $items['form-question'] = array(
+    'title' => 'Question Upload',
+    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => array('submit form_question'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('form_question_form'),
+  );
+  $items['form-submissions'] = array(
+    'title' => 'Question Submissions',
+    'type' => MENU_NORMAL_ITEM,
+    'access arguments' => array('access form_question submissions'),
+    'page callback' => 'form_question_submissions',
+  );
+
+  return $items;
+}
+
+function form_question_form($form, &$form_state) {
+	$form['subject'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Subject'),
+		'#size' => 30,
+		'#maxlength' => 40,
+		'#required' => TRUE,
+		'#description' => t('Math subject of this problem'),
+		);
+
+	$form['tags'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Tags'),
+		'#size' => 60,
+		'#maxlength' => 128,
+		'#required' => FALSE,
+		'#description' => t('Tags that can be used to find this question'),
+		);
+
+	$form['question'] = array(
+		'#title' => t('Math Question'),
+		'#type' => 'textarea',
+		'#description' => t('Math question to upload'),
+		'#default_value' => '',
+		'#required' => TRUE,
+		);
+
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Add item'),
+		);
+
+	return $form;
+}
+
+function form_question_form_validate($form, &$form_state) {
+	//print('<pre>'.print_r($form_state['values'],1).'</pre>');die();
+	if (is_numeric($form_state['values']['subject'])) {
+		form_set_error('subject', t('You must enter a valid subject'));
+		return FALSE;
+	}
+	return TRUE;
+}
+
+function form_question_form_submit($form, &$form_state) {
+	// $fe_id = db_insert('form_question')
+	// 	->fields(array(
+	// 		'subject' => $form_state['values']['subject'],
+	// 		'tags' => $form_state['values']['tags'],
+	// 		'question' => $form_state['values']['question'],
+	// 	))
+	// 	->execute();
+
+	// drupal_set_message(t("Your form entry has been added with a subject of '@subject', 
+	// 	tags of '@tags', and with the question as '@question'.", array(
+	// 		'@subject' => $form_state['values']['subject'],
+	// 		'@tags' => $form_state['values']['tags'],
+	// 		'@question' => $form_state['values']['question'],
+	// 		)));
+
+	/**
+  * This example:
+  * - Does not verify that the field values are correct
+  */
+  $body_text = $form_state['values']['question'];
+
+  $node = new stdClass();
+  $node->type = 'article';
+  node_object_prepare($node);
+
+  $node->title    = $form_state['values']['subject'];
+  $node->language = LANGUAGE_NONE; 
+  
+  $new_term = array(
+    'vid' => 1,
+    'name' => $form_state['values']['tags'],
+	);
+	$new_term = (object) $new_term;
+	taxonomy_term_save($new_term);
+
+  $node->field_tags[$node->language][0]['tid'] = $new_term->tid;
+
+  $node->body[$node->language][0]['value']   = $body_text;
+  $node->body[$node->language][0]['summary'] = text_summary($body_text);
+  $node->body[$node->language][0]['format']  = 'filtered_html';
+
+
+  $path = 'content/' .$form_state['values']['subject'] . date('YmdHis');
+  $node->path = array('alias' => $path);
+
+  node_save($node);
+
+ 	drupal_set_message(t("Your form entry has been added with a subject of '@subject', 
+ 		tags of '@tags', and with the question as '@question'.", array(
+		'@subject' => $form_state['values']['subject'],
+		'@tags' => $form_state['values']['tags'],
+		'@question' => $form_state['values']['question'],
+		)));
+
+}
+
+function form_question_submissions() {
+	$results = db_query("SELECT * FROM {form_question}");
+
+	$header = array(t('Subject'), t('Tags'), t('Question'));
+	$rows = array();
+
+	foreach($results AS $result) {
+		$rows[] = array(
+			$result->subject,
+			$result->tags,
+			$result->question,
+		);
+	}
+
+  $build = array();
+  $build['table'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+  );
+  $build['pager'] = array(
+    '#theme' => 'pager',
+  );
+  return $build;
+}
