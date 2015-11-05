@@ -110,20 +110,6 @@ function form_question_form_submit($form, &$form_state) {
   	$node->field_tags[$node->language][0]['tid'] = $new_term->tid;
 	}
 
-  
-  $new_term = array(
-    'vid' => 1,
-    'name' => $form_state['values']['tags'],
-	);
-	$new_term = (object) $new_term;
-	taxonomy_term_save($new_term);
-
-  $node->field_tags[$node->language][0]['tid'] = $new_term->tid;
-
-  //$node->field_tags[$node->language][0][] = "a";
-  //$node->field_tags[$node->language][]['tid']     = $form_state['values']['tags'];
-
-
   $node->body[$node->language][0]['value']   = $body_text;
   $node->body[$node->language][0]['summary'] = text_summary($body_text);
   $node->body[$node->language][0]['format']  = 'filtered_html';
@@ -148,14 +134,12 @@ function form_question_form_submit($form, &$form_state) {
     // 	);
   }
   node_save($node);
-
  	drupal_set_message(t("Your form entry has been added with a subject of '@subject', 
  		tags of '@tags', and with the question as '@question'.", array(
 		'@subject' => $form_state['values']['subject'],
 		'@tags' => $form_state['values']['tags'],
 		'@question' => $form_state['values']['question'],
 		)));
-
 }
 
 function form_question_submissions() {
