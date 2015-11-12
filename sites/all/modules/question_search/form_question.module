@@ -1,10 +1,10 @@
 <?php
 
 /**
- *
- *
- *
- *
+ * Supplies permissions that the module defines, 
+ * so that they can be selected on the user permissions 
+ * page and used to grant or restrict access to actions the 
+ * module performs
  */
 function form_question_permission() {
 	return array(
@@ -12,15 +12,16 @@ function form_question_permission() {
 			'title' => t('Submit form_question'),
 			'description' => t('Submit the form_question form'),
 			),
-		'access form_question submissions' => array(
-			'title' => t('Access form_question submissions'),
-			'description' => t('Access the form_question submissions'),
-			),
 		);
 }
 
+/**
+ * Registers paths for the module ot define how URL paths are handled
+ */
 function form_question_menu() {
   $items = array();
+  // defines the path 'form-question' and what should be displayed at the URL
+  // localhost:8888/form-question 
   $items['form-question'] = array(
     'title' => 'Question Upload',
     'type' => MENU_NORMAL_ITEM,
@@ -28,18 +29,15 @@ function form_question_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('form_question_form'),
   );
-  $items['form-submissions'] = array(
-    'title' => 'Question Submissions',
-    'type' => MENU_NORMAL_ITEM,
-    'access arguments' => array('access form_question submissions'),
-    'page callback' => 'form_question_submissions',
-  );
-
   return $items;
 }
 
+/**
+ * Helper function to query articles from mysql and return a sorted array
+ * of all subjects of submitted questions
+ */
 function get_subjects() {
-	$results = db_query("SELECT * FROM {node}");
+	$results = db_query("SELECT * FROM {node} WHERE type='article'");
 	$subjects = array();
 	if (!empty($results)) {
 		$subjects[] = t('');
@@ -53,7 +51,23 @@ function get_subjects() {
 	return $subjects;
 }
 
+/**
+ * Helper function to remove upload button for uploading images
+ * so that images are automatically uploaded when chosen 
+ */
+function remove_upload_button($image, &$form_state, $form) {
+	$image = file_managed_file_process($image, $form_state, $form);
+  $image['upload_button']['#access'] = FALSE;
+  return $image;
+}
+
+/**
+ * Sets what inputs and buttons will be on the form
+ */
 function form_question_form($form, &$form_state) {
+	// defines a select button for the form, it can be referenced in 
+	// form_question_form_submit($form, &$form_state) with 
+	// $form_state['values']['select_subject']
 	$form['select_subject'] = array(
 		'#type' => 'select',
 		'#title' => t('Select a Subject'),
@@ -90,16 +104,24 @@ function form_question_form($form, &$form_state) {
 	$form['file_upload'] = array(
 		'#title' => t('Upload File'),
 		'#type' => 'managed_file',
+		'#process' => array('remove_upload_button')
 		);
 
 	$form['submit'] = array(
 		'#type' => 'submit',
-		'#value' => t('Add item'),
+		'#value' => t('Add Question'),
 		);
 
 	return $form;
 }
 
+/**
+ * If false is returned, error will return on the page
+ * indicating fields that need to be filled in so that
+ * a question submission can be completed
+ * If true is returned, the question is submitted as 
+ * normal
+ */
 function form_question_form_validate($form, &$form_state) {
 	$valid = TRUE;
 	if (($form_state['values']['select_subject'] == 0) && (empty($form_state['values']['subject']))) {
@@ -113,6 +135,10 @@ function form_question_form_validate($form, &$form_state) {
 	return $valid;
 }
 
+/**
+ * Creates an article from the values that were
+ * input into the form before the submit button was pressed
+ */
 function form_question_form_submit($form, &$form_state) {
   $body_text = $form_state['values']['question'];
   $node = new stdClass();
@@ -120,12 +146,14 @@ function form_question_form_submit($form, &$form_state) {
   node_object_prepare($node);
   $node->language = LANGUAGE_NONE;
 
+  // formatting subject so that first letter of each word is UC and rest is LC
   if (!empty($form_state['values']['subject'])) {
   	$node->title = ucwords(strtolower($form_state['values']['subject']));
   } else {
   	$node->title = get_subjects()[$form_state['values']['select_subject']];
   }
 
+  // won't set tags if none were input, otherwise create term for tags
   if (!empty($form_state['values']['tags'])) {
  	  $new_term = array(
  	    'vid' => 1,
@@ -144,6 +172,7 @@ function form_question_form_submit($form, &$form_state) {
   $path = 'content/' .$form_state['values']['subject'] . date('YmdHis');
   $node->path = array('alias' => $path);
 
+  // uploading image file
   if (!empty($form_state['values']['file_upload'])) {
   	$filepath = drupal_realpath($form_state['values']['file_upload']);
     $file = file_load($form_state['values']['file_upload']);
@@ -152,39 +181,17 @@ function form_question_form_submit($form, &$form_state) {
     $node->field_image[LANGUAGE_NONE][0] = (array)$file;
   }
   $title = $node->title;
+  
+  // field_search_title used so that the both the title search facet will have
+  // both words and the title can be searched on
   $node->field_search_title[LANGUAGE_NONE][0]['value'] = $title;
   node_save($node);
 
+  // returning confirmation message for uploaded question
  	drupal_set_message(t("Your form entry has been added with a subject of '@subject', 
  		tags of '@tags', and with the question as '@question'.", array(
 		'@subject' => $title,
 		'@tags' => $form_state['values']['tags'],
 		'@question' => $form_state['values']['question'],
 	)));
-}
-
-function form_question_submissions() {
-	$results = db_query("SELECT * FROM {form_question}");
-
-	$header = array(t('Subject'), t('Tags'), t('Question'));
-	$rows = array();
-
-	foreach($results AS $result) {
-		$rows[] = array(
-			$result->subject,
-			$result->tags,
-			$result->question,
-		);
-	}
-
-  $build = array();
-  $build['table'] = array(
-    '#theme' => 'table',
-    '#header' => $header,
-    '#rows' => $rows,
-  );
-  $build['pager'] = array(
-    '#theme' => 'pager',
-  );
-  return $build;
 }
