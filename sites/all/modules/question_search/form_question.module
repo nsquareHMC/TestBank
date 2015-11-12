@@ -1,7 +1,10 @@
 <?php
 
 /**
- * Implements hook_permission().
+ *
+ *
+ *
+ *
  */
 function form_question_permission() {
 	return array(
@@ -35,20 +38,36 @@ function form_question_menu() {
   return $items;
 }
 
+function get_subjects() {
+	$results = db_query("SELECT * FROM {node}");
+	$subjects = array();
+	if (!empty($results)) {
+		$subjects[] = t('');
+		foreach($results AS $result) {
+			if (!in_array(ucwords(strtolower(t($result->title))),$subjects)) {
+				$subjects[] = ucwords(strtolower(t($result->title)));
+			}	
+		}
+		sort($subjects);
+	}
+	return $subjects;
+}
+
 function form_question_form($form, &$form_state) {
+	$form['select_subject'] = array(
+		'#type' => 'select',
+		'#title' => t('Select a Subject'),
+		'#options' => get_subjects(),
+		'#description' => t('A subject must be selected here or input below. Please only use one.')
+		);
+
 	$form['subject'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Subject'),
 		'#size' => 30,
 		'#maxlength' => 40,
-		'#required' => TRUE,
-		'#description' => t('Math subject of this problem'),
-		);
-
-	$form['select_subject'] = array(
-		'#type' => 'select',
-		'#title' => t('Select a Subject.'),
-		'#options' => array('Math'),
+		'#required' => FALSE,
+		'#description' => t('Only use if your subject is not in the selection above.'),
 		);
 
 	$form['tags'] = array(
@@ -57,13 +76,13 @@ function form_question_form($form, &$form_state) {
 		'#size' => 60,
 		'#maxlength' => 128,
 		'#required' => FALSE,
-		'#description' => t('Tags that can be used to find this question'),
+		'#description' => t('Input tags that can be used to find this question.'),
 		);
 
 	$form['question'] = array(
 		'#title' => t('Math Question'),
 		'#type' => 'textarea',
-		'#description' => t('Math question to upload'),
+		'#description' => t('Input math question or upload file below.'),
 		'#default_value' => '',
 		'#required' => FALSE,
 		);
@@ -82,22 +101,30 @@ function form_question_form($form, &$form_state) {
 }
 
 function form_question_form_validate($form, &$form_state) {
-	if (is_numeric($form_state['values']['subject'])) {
-		form_set_error('subject', t('You must enter a valid subject'));
-		return FALSE;
+	$valid = TRUE;
+	if (($form_state['values']['select_subject'] == 0) && (empty($form_state['values']['subject']))) {
+		form_set_error('subject', t('You must select or enter a subject'));
+  	$valid = FALSE;
+  }
+  if (empty($form_state['values']['question']) && (empty($form_state['values']['file_upload']))) {
+  	form_set_error('question', t('You must enter or upload a question'));
+  	$valid = FALSE;
 	}
-	return TRUE;
+	return $valid;
 }
 
 function form_question_form_submit($form, &$form_state) {
   $body_text = $form_state['values']['question'];
-
   $node = new stdClass();
   $node->type = 'article';
   node_object_prepare($node);
+  $node->language = LANGUAGE_NONE;
 
-  $node->title    = $form_state['values']['subject'];
-  $node->language = LANGUAGE_NONE; 
+  if (!empty($form_state['values']['subject'])) {
+  	$node->title = ucwords(strtolower($form_state['values']['subject']));
+  } else {
+  	$node->title = get_subjects()[$form_state['values']['select_subject']];
+  }
 
   if (!empty($form_state['values']['tags'])) {
  	  $new_term = array(
@@ -120,26 +147,20 @@ function form_question_form_submit($form, &$form_state) {
   if (!empty($form_state['values']['file_upload'])) {
   	$filepath = drupal_realpath($form_state['values']['file_upload']);
     $file = file_load($form_state['values']['file_upload']);
-    //$file->filesize = filesize($form_state['values']['file_upload']);
     $file->status = FILE_STATUS_PERMANENT;
     file_save($file);
-    //$image = image_load($file->uri);
-    //image_save($image);
-    //unset($form_state['values']['file_upload']);
-    //$node->field_image[$node->language][0]['fid'] = $file->fid;
     $node->field_image[LANGUAGE_NONE][0] = (array)$file;
-    // array(
-    // 			'fid' => $file->fid,
-    // 			'description' => '',
-    // 	);
   }
+  $title = $node->title;
+  $node->field_search_title[LANGUAGE_NONE][0]['value'] = $title;
   node_save($node);
+
  	drupal_set_message(t("Your form entry has been added with a subject of '@subject', 
  		tags of '@tags', and with the question as '@question'.", array(
-		'@subject' => $form_state['values']['subject'],
+		'@subject' => $title,
 		'@tags' => $form_state['values']['tags'],
 		'@question' => $form_state['values']['question'],
-		)));
+	)));
 }
 
 function form_question_submissions() {
